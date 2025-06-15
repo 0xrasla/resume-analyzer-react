@@ -8,13 +8,17 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import type { ResumeAnalysis } from "@/lib/openrouter-service";
+import { OpenRouterService } from "@/lib/openrouter-service";
 import { createFileRoute } from "@tanstack/react-router";
 import {
-  AlertCircle,
+  AlertTriangle,
+  BarChart,
   Brain,
   CheckCircle,
-  FileText,
-  Star,
+  Lightbulb,
+  ListChecks,
+  Tag,
   Target,
   TrendingUp,
   Upload,
@@ -25,24 +29,15 @@ export const Route = createFileRoute("/")({
   component: App,
 });
 
-interface AnalysisResult {
-  overallScore: number;
-  sections: {
-    name: string;
-    score: number;
-    feedback: string;
-    status: "excellent" | "good" | "needs-improvement";
-  }[];
-  keywords: string[];
-  suggestions: string[];
-  strengths: string[];
-  fileName: string;
-}
-
 function App() {
   const [isDragging, setIsDragging] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [userName, setUserName] = useState("");
+  const [userDetails, setUserDetails] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [analysis, setAnalysis] = useState<ResumeAnalysis | null>(null);
+  const openRouter = new OpenRouterService();
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -54,122 +49,44 @@ function App() {
     setIsDragging(false);
   };
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-
-    const files = Array.from(e.dataTransfer.files);
-    const pdfFile = files.find((file) => file.type === "application/pdf");
-
-    if (pdfFile) {
-      analyzeResume(pdfFile);
-    }
-  };
-
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && file.type === "application/pdf") {
-      analyzeResume(file);
+      setSelectedFile(file);
     }
   };
 
-  const analyzeResume = async (file: File) => {
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const files = Array.from(e.dataTransfer.files);
+    const pdfFile = files.find((file) => file.type === "application/pdf");
+    if (pdfFile) {
+      setSelectedFile(pdfFile);
+    }
+  };
+
+  const handleAnalyze = async () => {
+    if (!selectedFile) return;
     setIsAnalyzing(true);
-
-    await new Promise((resolve) => setTimeout(resolve, 3000));
-
-    const mockAnalysis: AnalysisResult = {
-      overallScore: 78,
-      fileName: file.name,
-      sections: [
-        {
-          name: "Contact Information",
-          score: 95,
-          feedback:
-            "Complete contact details with professional email and LinkedIn profile.",
-          status: "excellent",
-        },
-        {
-          name: "Professional Summary",
-          score: 72,
-          feedback:
-            "Good summary but could be more specific about achievements and quantifiable results.",
-          status: "good",
-        },
-        {
-          name: "Work Experience",
-          score: 85,
-          feedback:
-            "Strong work history with relevant experience. Consider adding more metrics and achievements.",
-          status: "excellent",
-        },
-        {
-          name: "Skills Section",
-          score: 68,
-          feedback:
-            "Skills are listed but lack context. Consider organizing by categories and proficiency levels.",
-          status: "needs-improvement",
-        },
-        {
-          name: "Education",
-          score: 90,
-          feedback:
-            "Education section is well-formatted with relevant details and achievements.",
-          status: "excellent",
-        },
-        {
-          name: "Formatting & Design",
-          score: 75,
-          feedback:
-            "Clean layout but could benefit from better use of white space and consistent formatting.",
-          status: "good",
-        },
-      ],
-      keywords: [
-        "JavaScript",
-        "React",
-        "Node.js",
-        "Python",
-        "AWS",
-        "Project Management",
-        "Agile",
-        "SQL",
-      ],
-      suggestions: [
-        "Add quantifiable achievements to work experience (e.g., 'Increased sales by 25%')",
-        "Include relevant certifications or professional development courses",
-        "Optimize for ATS by using standard section headings",
-        "Add a projects section to showcase technical skills",
-        "Consider adding volunteer work or leadership experience",
-      ],
-      strengths: [
-        "Strong technical background with relevant programming languages",
-        "Consistent work history with progressive responsibility",
-        "Good educational foundation",
-        "Professional contact information and online presence",
-      ],
-    };
-
-    setAnalysis(mockAnalysis);
-    setIsAnalyzing(false);
-  };
-
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return "text-green-600";
-    if (score >= 60) return "text-yellow-600";
-    return "text-red-600";
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "excellent":
-        return <CheckCircle className="w-4 h-4 text-green-600" />;
-      case "good":
-        return <Star className="w-4 h-4 text-yellow-600" />;
-      case "needs-improvement":
-        return <AlertCircle className="w-4 h-4 text-red-600" />;
-      default:
-        return null;
+    setError(null);
+    setAnalysis(null);
+    try {
+      const result = await openRouter.analyzeResumeJSON(
+        selectedFile,
+        userName,
+        userDetails
+      );
+      setAnalysis(result);
+    } catch (err: any) {
+      console.error("Analysis error:", err);
+      if (err.message.includes("parse")) {
+        setError("Failed to parse AI response. Please try again.");
+      } else {
+        setError(err.message || "Failed to analyze resume.");
+      }
+    } finally {
+      setIsAnalyzing(false);
     }
   };
 
@@ -191,34 +108,64 @@ function App() {
         </div>
       </nav>
 
+      <div className="text-center my-12">
+        <h1 className="text-4xl font-bold text-slate-900 mb-4">
+          AI-Powered Resume Analysis
+        </h1>
+        <p className="text-xl text-slate-600 mb-8 max-w-3xl mx-auto">
+          Get instant feedback on your resume with our advanced AI analyzer.
+          Improve your chances of landing your dream job with actionable
+          insights and optimization tips.
+        </p>
+        <div className="flex justify-center space-x-8 text-sm text-slate-500">
+          <div className="flex items-center space-x-2">
+            <Target className="w-4 h-4" />
+            <span>ATS Optimization</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <TrendingUp className="w-4 h-4" />
+            <span>Score Analysis</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <CheckCircle className="w-4 h-4" />
+            <span>Instant Feedback</span>
+          </div>
+        </div>
+      </div>
+
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {!analysis && (
-          <div className="text-center mb-12">
-            <h1 className="text-4xl font-bold text-slate-900 mb-4">
-              AI-Powered Resume Analysis
-            </h1>
-            <p className="text-xl text-slate-600 mb-8 max-w-3xl mx-auto">
-              Get instant feedback on your resume with our advanced AI analyzer.
-              Improve your chances of landing your dream job with actionable
-              insights and optimization tips.
-            </p>
-            <div className="flex justify-center space-x-8 text-sm text-slate-500">
-              <div className="flex items-center space-x-2">
-                <Target className="w-4 h-4" />
-                <span>ATS Optimization</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <TrendingUp className="w-4 h-4" />
-                <span>Score Analysis</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <CheckCircle className="w-4 h-4" />
-                <span>Instant Feedback</span>
-              </div>
-            </div>
+        {error && (
+          <div className="mb-6 text-center text-red-600 font-semibold">
+            {error}
           </div>
         )}
-
+        {!analysis && (
+          <Card className="max-w-2xl mx-auto mb-8">
+            <CardHeader>
+              <CardTitle className="text-center">Resume Details</CardTitle>
+              <CardDescription className="text-center">
+                Enter your name and a short description or job target
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <input
+                  className="w-full border rounded px-3 py-2"
+                  placeholder="Your Name"
+                  value={userName}
+                  onChange={(e) => setUserName(e.target.value)}
+                />
+                <textarea
+                  className="w-full border rounded px-3 py-2"
+                  placeholder="Describe your career goals, target job, or anything for context..."
+                  rows={3}
+                  value={userDetails}
+                  onChange={(e) => setUserDetails(e.target.value)}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        )}
         {!analysis && (
           <Card className="max-w-2xl mx-auto">
             <CardHeader>
@@ -273,133 +220,134 @@ function App() {
                   </div>
                 )}
               </div>
+              <Button
+                className="w-full mt-6"
+                onClick={handleAnalyze}
+                disabled={isAnalyzing || !selectedFile || !userName}
+              >
+                Analyze
+              </Button>
             </CardContent>
           </Card>
         )}
-
         {analysis && (
-          <div className="space-y-8">
-            <div className="text-center">
-              <div className="flex items-center justify-center space-x-2 mb-4">
-                <FileText className="w-6 h-6 text-slate-600" />
-                <h2 className="text-2xl font-bold text-slate-900">
-                  {analysis.fileName}
+          <Card className="max-w-4xl mx-auto">
+            <CardHeader>
+              <CardTitle>Resume Analysis Report</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-8">
+              {/* Score Section */}
+              <div>
+                <h2 className="text-xl font-bold flex items-center gap-2 mb-4">
+                  <BarChart className="h-5 w-5 text-blue-600" />
+                  Scores
                 </h2>
-              </div>
-              <div className="flex items-center justify-center space-x-4">
-                <div className="text-center">
-                  <div
-                    className={`text-4xl font-bold ${getScoreColor(analysis.overallScore)}`}
-                  >
-                    {analysis.overallScore}
-                  </div>
-                  <div className="text-sm text-slate-500">Overall Score</div>
-                </div>
-                <div className="w-32">
-                  <Progress value={analysis.overallScore} className="h-2" />
-                </div>
-              </div>
-              <Button
-                variant="outline"
-                className="mt-4"
-                onClick={() => setAnalysis(null)}
-              >
-                Analyze Another Resume
-              </Button>
-            </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Section Analysis</CardTitle>
-                <CardDescription>
-                  Detailed breakdown of each resume section
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {analysis.sections.map((section, index) => (
-                  <div key={index} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        {getStatusIcon(section.status)}
-                        <span className="font-medium">{section.name}</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <span
-                          className={`font-bold ${getScoreColor(section.score)}`}
-                        >
-                          {section.score}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {Object.entries(analysis.scores).map(([key, score]) => (
+                    <div key={key} className="border rounded-lg p-4">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="font-medium capitalize">{key}</span>
+                        <span className="font-bold text-lg">
+                          {score.score}/100
                         </span>
-                        <div className="w-20">
-                          <Progress value={section.score} className="h-1" />
-                        </div>
                       </div>
+                      <Progress value={score.score} className="h-2 mb-2" />
+                      <p className="text-sm text-slate-600">
+                        {score.explanation}
+                      </p>
                     </div>
-                    <p className="text-sm text-slate-600 ml-6">
-                      {section.feedback}
-                    </p>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
+                  ))}
+                </div>
+              </div>
 
-            <div className="grid md:grid-cols-2 gap-8">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Detected Keywords</CardTitle>
-                  <CardDescription>
-                    Important keywords found in your resume
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap gap-2">
-                    {analysis.keywords.map((keyword, index) => (
-                      <Badge key={index} variant="secondary">
-                        {keyword}
-                      </Badge>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+              {/* Summary Section */}
+              <div>
+                <h2 className="text-xl font-bold mb-3">Summary</h2>
+                <p className="text-slate-700">{analysis.summary}</p>
+              </div>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Key Strengths</CardTitle>
-                  <CardDescription>What your resume does well</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-2">
-                    {analysis.strengths.map((strength, index) => (
-                      <li key={index} className="flex items-start space-x-2">
-                        <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                        <span className="text-sm">{strength}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
-            </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Improvement Suggestions</CardTitle>
-                <CardDescription>
-                  Actionable recommendations to enhance your resume
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-3">
-                  {analysis.suggestions.map((suggestion, index) => (
-                    <li key={index} className="flex items-start space-x-2">
-                      <TrendingUp className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                      <span className="text-sm">{suggestion}</span>
+              {/* Strengths Section */}
+              <div>
+                <h2 className="text-xl font-bold flex items-center gap-2 mb-3">
+                  <ListChecks className="h-5 w-5 text-green-600" />
+                  Strengths
+                </h2>
+                <ul className="space-y-2">
+                  {analysis.strengths.map((strength, i) => (
+                    <li key={i} className="flex items-start">
+                      <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 mr-2 shrink-0" />
+                      <span>{strength}</span>
                     </li>
                   ))}
                 </ul>
-              </CardContent>
-            </Card>
-          </div>
+              </div>
+
+              {/* Weaknesses Section */}
+              <div>
+                <h2 className="text-xl font-bold flex items-center gap-2 mb-3">
+                  <AlertTriangle className="h-5 w-5 text-amber-600" />
+                  Areas for Improvement
+                </h2>
+                <ul className="space-y-2">
+                  {analysis.weaknesses.map((weakness, i) => (
+                    <li key={i} className="flex items-start">
+                      <span className="h-5 w-5 text-amber-500 mt-0.5 mr-2 shrink-0">
+                        •
+                      </span>
+                      <span>{weakness}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Suggestions Section */}
+              <div>
+                <h2 className="text-xl font-bold flex items-center gap-2 mb-3">
+                  <Lightbulb className="h-5 w-5 text-blue-600" />
+                  Actionable Suggestions
+                </h2>
+                <ul className="space-y-2">
+                  {analysis.suggestions.map((suggestion, i) => (
+                    <li key={i} className="flex items-start">
+                      <span className="h-5 w-5 text-blue-500 mt-0.5 mr-2 shrink-0">
+                        {i + 1}.
+                      </span>
+                      <span>{suggestion}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Keywords Section */}
+              <div>
+                <h2 className="text-xl font-bold flex items-center gap-2 mb-3">
+                  <Tag className="h-5 w-5 text-purple-600" />
+                  Detected Keywords
+                </h2>
+                <div className="flex flex-wrap gap-2">
+                  {analysis.detectedKeywords.map((keyword, i) => (
+                    <Badge key={i} variant="secondary" className="text-sm py-1">
+                      {keyword}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              <Button
+                className="mt-6"
+                onClick={() => {
+                  setAnalysis(null);
+                  setSelectedFile(null);
+                }}
+              >
+                Analyze Another Resume
+              </Button>
+            </CardContent>
+          </Card>
         )}
       </div>
     </div>
   );
 }
+
+export default App;
