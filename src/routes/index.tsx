@@ -8,7 +8,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import type { ResumeAnalysis } from "@/lib/openrouter-service";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   AlertTriangle,
@@ -23,6 +22,7 @@ import {
   Upload,
 } from "lucide-react";
 import { useState } from "react";
+import type { ResumeAnalysis } from "types";
 
 export const Route = createFileRoute("/")({
   component: App,
