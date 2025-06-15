@@ -1,0 +1,2 @@
+export const OPENAI_KEY =
+  "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";

@@ -5,4 +5,4 @@ dist-ssr
 *.local
 count.txt
 .env
-env.ts
+# env.ts
