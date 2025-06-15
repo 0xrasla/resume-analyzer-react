@@ -100,9 +100,7 @@ DO NOT use markdown formatting, backticks, or any other text outside of the JSON
     let content = completions.choices?.[0]?.message?.content || "";
 
     try {
-      // Check if the content is wrapped in backticks (markdown code blocks)
       if (content.includes("```")) {
-        // Extract JSON from code blocks (assuming format like ```json or ``` followed by JSON)
         const jsonMatch = content.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
         if (jsonMatch && jsonMatch[1]) {
           content = jsonMatch[1].trim();
