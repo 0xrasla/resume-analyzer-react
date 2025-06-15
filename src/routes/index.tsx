@@ -9,7 +9,6 @@ import {
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import type { ResumeAnalysis } from "@/lib/openrouter-service";
-import { OpenRouterService } from "@/lib/openrouter-service";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   AlertTriangle,
@@ -37,7 +36,6 @@ function App() {
   const [userDetails, setUserDetails] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [analysis, setAnalysis] = useState<ResumeAnalysis | null>(null);
-  const openRouter = new OpenRouterService();
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -72,11 +70,19 @@ function App() {
     setError(null);
     setAnalysis(null);
     try {
-      const result = await openRouter.analyzeResumeJSON(
-        selectedFile,
-        userName,
-        userDetails
-      );
+      const result = {
+        scores: {
+          overall: { score: 85, explanation: "Brief explanation" },
+          ats: { score: 80, explanation: "Brief explanation" },
+          skills: { score: 90, explanation: "Brief explanation" },
+          formatting: { score: 85, explanation: "Brief explanation" },
+        },
+        summary: "Summary text about the resume",
+        strengths: ["Strength 1", "Strength 2", "Strength 3"],
+        weaknesses: ["Weakness 1", "Weakness 2", "Weakness 3"],
+        suggestions: ["Suggestion 1", "Suggestion 2", "Suggestion 3"],
+        detectedKeywords: ["Keyword 1", "Keyword 2", "Keyword 3"],
+      };
       setAnalysis(result);
     } catch (err: any) {
       console.error("Analysis error:", err);
